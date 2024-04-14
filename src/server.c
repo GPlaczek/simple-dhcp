@@ -11,17 +11,27 @@
 char dgram_buf[PAYLOAD_SIZE];
 
 int main(int argv, char **args) {
-	int err, sfd;
+	int err, sfd, sockopt;
 	ssize_t msg_size;
 	struct sockaddr dgram_addr;
 	socklen_t addrlen = sizeof(dgram_addr);
 
 	sfd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sfd < 0) {
+		fprintf(stderr, "Could not create socket (error %d)\n", errno);
+		return 1;
+	}
+	sockopt=1;
+	err = setsockopt(sfd, SOL_SOCKET, SO_BROADCAST, &sockopt, sizeof(sockopt));
+	if (err < 0) {
+		fprintf(stderr, "Could not set socket broadcast option (error %d)\n", errno);
+		return 1;
+	}
 
-	struct sockaddr_in bind_addr = { AF_INET, htons(6677), INADDR_ANY };
+	struct sockaddr_in bind_addr = { AF_INET, htons(67), INADDR_ANY };
 	err = bind(sfd, (struct sockaddr*) &bind_addr, sizeof(bind_addr));
 	if (err < 0) {
-		fprintf(stderr, "Could not bind to the given address (error %d)", errno);
+		fprintf(stderr, "Could not bind to the given address (error %d)\n", errno);
 		return 1;
 	}
 
