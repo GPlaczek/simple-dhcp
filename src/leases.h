@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 
 struct lease {
+	uint32_t xid;
 	in_addr_t ipaddr;
 	uint8_t chaddr[16];
 	int efd;

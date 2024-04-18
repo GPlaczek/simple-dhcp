@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#define DEFAULT_LEASE_TIME  86400
 
 struct rfc2131_dhcp_msg dhcp_msg, dhcp_resp;
 struct leaselist llist;
@@ -47,17 +48,13 @@ void print_dhcp_msg() {
 	printf("\n");
 }
 
-int check_magic_cookie(uint8_t *options) {
-	return *(uint32_t *)options == RFC2131_MAGIC_COOKIE;
-}
-
 struct lease *process_dhcp_msg() {
 	struct lease *lease = NULL;
 
 	if (dhcp_msg.op != RFC2131_OP_BOOTREQUEST)
 		goto exit;
 
-	if (!(check_magic_cookie(dhcp_msg.options)))
+	if (*(uint32_t *)dhcp_msg.options != RFC2131_MAGIC_COOKIE)
 		goto exit;
 
 	uint8_t *option_ptr = dhcp_msg.options + 4;
@@ -72,8 +69,6 @@ struct lease *process_dhcp_msg() {
 			msgtype = *option_ptr;
 			break;
 		case RFC2131_OPTION_CLIENT_ID:
-			printf("%d\n", option_id);
-			printf("%d\n", option_len);
 			client_id.len = option_len;
 			client_id.ptr = option_ptr;
 			break;
@@ -85,9 +80,21 @@ struct lease *process_dhcp_msg() {
 	switch (msgtype) {
 	case RFC2131_OPTION_MSGTYPE_DHCPDISCOVER:
 		lease = leaselist_get_lease(&llist);
+		lease->xid = dhcp_msg.xid;
 		memcpy(lease->chaddr, dhcp_msg.chaddr, 16);
 		goto exit;
 	case RFC2131_OPTION_MSGTYPE_DHCPREQUEST:
+		for (int i = 0; i < llist.len; i++) {
+			if (llist.lease_vec[i].xid == dhcp_msg.xid) {
+				lease = &llist.lease_vec[i];
+				lease->efd = 1;
+				break;
+			}
+		}
+
+		if (lease == NULL) {
+			goto exit;
+		}
 	case RFC2131_OPTION_MSGTYPE_DHCPDECLINE:
 	case RFC2131_OPTION_MSGTYPE_DHCPRELEASE:
 	case RFC2131_OPTION_MSGTYPE_DHCPINFORM:
@@ -110,6 +117,9 @@ void init_dhcp_resp() {
 	dhcp_resp.giaddr = 0;
 	dhcp_resp.sname[0] = 0;
 	dhcp_resp.file[0] = 0;
+
+	uint32_t *options32 = (uint32_t *) dhcp_resp.options;
+	options32[0] = RFC2131_MAGIC_COOKIE;
 }
 
 int main(int argv, char **args) {
@@ -160,20 +170,39 @@ int main(int argv, char **args) {
 			dhcp_resp.htype = dhcp_msg.htype;
 			dhcp_resp.hlen = dhcp_msg.hlen;
 			dhcp_resp.xid = dhcp_msg.xid;
-			dhcp_resp.ciaddr = 0;
 			dhcp_resp.yiaddr = htonl(l->ipaddr);
 			dhcp_resp.giaddr = dhcp_msg.giaddr;
 			memcpy(dhcp_resp.chaddr, dhcp_msg.chaddr, 16);
-			uint32_t *options32 = (uint32_t *) dhcp_resp.options;
-			options32[0] = RFC2131_MAGIC_COOKIE;
-			dhcp_resp.options[4] = 0x35;
-			dhcp_resp.options[5] = 0x01;
-			dhcp_resp.options[6] = RFC2131_OPTION_MSGTYPE_DHCPOFFER;
-			dhcp_resp.options[7] = 0xff;
-			// dhcp_resp.options[7] = RFC2131_OPTION_CLIENT_ID;
-			// dhcp_resp.options[8] = client_id.len;
-			// memcpy(dhcp_resp.options + 9, client_id.ptr, client_id.len);
-			// dhcp_resp.options[9+client_id.len] = 0xff;
+			int i = 4;
+
+			if (l->efd == -1) {
+				dhcp_resp.ciaddr = 0;
+				dhcp_resp.options[i++] = 0x35;
+				dhcp_resp.options[i++] = 0x01;
+				dhcp_resp.options[i++] = RFC2131_OPTION_MSGTYPE_DHCPOFFER;
+			} else {
+				dhcp_resp.ciaddr = dhcp_msg.ciaddr;
+				dhcp_resp.options[i++] = 0x35;
+				dhcp_resp.options[i++] = 0x01;
+				dhcp_resp.options[i++] = RFC2131_OPTION_MSGTYPE_DHCPACK;
+			}
+
+			dhcp_resp.options[i++] = RFC2131_OPTION_IP_ADDRESS_LEASE_TIME;
+			dhcp_resp.options[i++] = 0x04;
+			uint32_t *ltime = (uint32_t *)(dhcp_resp.options + i);
+			*ltime = DEFAULT_LEASE_TIME;
+			i+=4;
+
+			if (client_id.len > 0) {
+				dhcp_resp.options[i++] = RFC2131_OPTION_CLIENT_ID;
+				dhcp_resp.options[i++] = client_id.len;
+				memcpy(dhcp_resp.options + i, client_id.ptr, client_id.len);
+				i += client_id.len;
+				dhcp_resp.options[i++] = 0xff;
+				client_id.len = 0;
+			}
+
+			dhcp_resp.options[i++] = 0xff;
 		}
 
 		msg_size = sendto(sfd, &dhcp_resp, sizeof(dhcp_resp), 0, (const struct sockaddr *)&s1, sizeof(s1));

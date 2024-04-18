@@ -41,6 +41,7 @@ struct lease *leaselist_get_lease(struct leaselist *ll) {
 	}
 
 	lease->ipaddr = __ind_to_addr(ll, ll->len);
+	lease->efd = -1;
 
 	return lease;
 }
