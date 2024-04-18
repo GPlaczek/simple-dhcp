@@ -139,6 +139,8 @@ void prepare_response(
 		switch (parameter_request_list.ptr[j]) {
 		case RFC2131_OPTION_SUBNET_MASK:
 			i += write_option32(dhcp_resp->options + i, RFC2131_OPTION_SUBNET_MASK, srv->llist.netmask); break;
+		case RFC2131_OPTION_DOMAIN_NAME_SERVER:
+			i += write_option32(dhcp_resp->options + i, RFC2131_OPTION_DOMAIN_NAME_SERVER, srv->dns); break;
 		}
 	}
 	dhcp_resp->options[i++] = 0xff;
