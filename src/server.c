@@ -14,7 +14,6 @@
 
 
 struct rfc2131_dhcp_msg dhcp_msg, dhcp_resp;
-struct leaselist llist;
 
 
 void init_dhcp_resp() {
@@ -33,11 +32,17 @@ void init_dhcp_resp() {
 	options32[0] = RFC2131_MAGIC_COOKIE;
 }
 
-int main(int argv, char **args) {
+int main(int argc, char **argv) {
 	int err, sfd, sockopt;
 	ssize_t msg_size;
 	struct sockaddr dgram_addr;
 	socklen_t addrlen = sizeof(dgram_addr);
+
+	struct cli_args cli;
+	memset(&cli, 0, sizeof(cli));
+	parse_command_line(argc, argv, &cli);
+	struct dhcp_server dhcpsrv;
+	create(&cli, &dhcpsrv);
 
 	sfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sfd < 0) {
@@ -58,7 +63,6 @@ int main(int argv, char **args) {
 		return 1;
 	}
 
-	leaselist_init(&llist, htonl(inet_addr("192.168.16.0")), htonl(inet_addr("255.255.255.0")));
 	init_dhcp_resp();
 
 	struct sockaddr_in s1;
@@ -73,7 +77,7 @@ int main(int argv, char **args) {
 		if (msg_size <= 0)
 			fprintf(stderr, "Error receiving the message (error %d)\n", errno);
 
-		process_dhcp_msg(&dhcp_msg, &dhcp_resp, &llist);
+		process_dhcp_msg(&dhcp_msg, &dhcp_resp, &dhcpsrv);
 
 		msg_size = sendto(sfd, &dhcp_resp, sizeof(dhcp_resp), 0, (const struct sockaddr *)&s1, sizeof(s1));
 

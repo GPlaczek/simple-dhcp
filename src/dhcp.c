@@ -1,9 +1,10 @@
 #include "rfc2131.h"
 #include "leases.h"
 #include "dhcp.h"
+#include "cli.h"
 
 #include <stdint.h>
-#include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define DEFAULT_LEASE_TIME  htonl(86400)
@@ -39,7 +40,7 @@ size_t write_option(uint8_t *restrict options, uint8_t option_type, void *restri
 
 struct lease *get_new_lease(
 	struct rfc2131_dhcp_msg *dhcp_msg,
-	struct leaselist *llist
+	struct dhcp_server *srv
 ) {
 	struct lease *lease = NULL;
 
@@ -75,9 +76,9 @@ struct lease *get_new_lease(
 
 	switch (msgtype) {
 	case RFC2131_OPTION_MSGTYPE_DHCPREQUEST:
-		for (int i = 0; i < llist->len; i++) {
-			if (llist->lease_vec[i].xid == dhcp_msg->xid) {
-				lease = &llist->lease_vec[i];
+		for (int i = 0; i < srv->llist.len; i++) {
+			if (srv->llist.lease_vec[i].xid == dhcp_msg->xid) {
+				lease = &srv->llist.lease_vec[i];
 				lease->efd = 1;
 				break;
 			}
@@ -87,7 +88,7 @@ struct lease *get_new_lease(
 			break;
 		// fall through
 	case RFC2131_OPTION_MSGTYPE_DHCPDISCOVER:
-		lease = leaselist_get_lease(llist);
+		lease = leaselist_get_lease(&srv->llist);
 		lease->xid = dhcp_msg->xid;
 		memcpy(lease->chaddr, dhcp_msg->chaddr, 16);
 		goto exit;
@@ -105,7 +106,7 @@ exit:
 void prepare_response(
 	struct rfc2131_dhcp_msg *dhcp_msg,
 	struct rfc2131_dhcp_msg *dhcp_resp,
-	struct leaselist *llist,
+	struct dhcp_server *srv,
 	struct lease *lease
 ) {
 	if (lease == NULL)
@@ -137,7 +138,7 @@ void prepare_response(
 	for (int j = 0; j < parameter_request_list.len; j++) {
 		switch (parameter_request_list.ptr[j]) {
 		case RFC2131_OPTION_SUBNET_MASK:
-			i += write_option32(dhcp_resp->options + i, RFC2131_OPTION_SUBNET_MASK, htonl(llist->netmask)); break;
+			i += write_option32(dhcp_resp->options + i, RFC2131_OPTION_SUBNET_MASK, srv->llist.netmask); break;
 		}
 	}
 	dhcp_resp->options[i++] = 0xff;
@@ -146,8 +147,33 @@ void prepare_response(
 void process_dhcp_msg(
 	struct rfc2131_dhcp_msg *dhcp_msg,
 	struct rfc2131_dhcp_msg *dhcp_resp,
-	struct leaselist *llist
+	struct dhcp_server *srv
 ) {
-	struct lease *lease = get_new_lease(dhcp_msg, llist);
-	prepare_response(dhcp_msg, dhcp_resp, llist, lease);
+	struct lease *lease = get_new_lease(dhcp_msg, srv);
+	prepare_response(dhcp_msg, dhcp_resp, srv, lease);
+}
+
+void create(struct cli_args *cli, struct dhcp_server *srv) {
+	in_addr_t address, netmask;
+	if (cli->gateway)
+		srv->gateway = inet_addr(cli->gateway);
+	else
+		srv->gateway = inet_addr("192.168.1.1");
+
+	if (cli->dns)
+		srv->dns = inet_addr(cli->dns);
+	else
+		srv->dns = inet_addr("8.8.8.8");
+
+	if (cli->address)
+		address = inet_addr(cli->address);
+	else
+		address = inet_addr("192.168.1.0");
+
+	if (cli->netmask)
+		netmask = inet_addr(cli->netmask);
+	else
+		netmask = inet_addr("255.255.255.0");
+
+	leaselist_init(&srv->llist, ntohl(address), netmask);
 }
