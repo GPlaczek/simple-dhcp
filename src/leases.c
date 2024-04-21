@@ -15,6 +15,7 @@ void leaselist_init(struct leaselist *ll, in_addr_t na, in_addr_t nm) {
 	else
 		initial_cap = net_size;
 
+	ll->max_lease_time = 30;  // TODO: make this configurable with a reasonable default
 	ll->lease_vec = malloc(sizeof(struct lease) * initial_cap);
 	ll->cap = initial_cap;
 	ll->net_size = net_size;

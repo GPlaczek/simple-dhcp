@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
+#include <poll.h>
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -35,6 +36,7 @@ int main(int argc, char **argv) {
 	int err, sfd, sockopt;
 	ssize_t msg_size;
 	struct sockaddr dgram_addr;
+	struct pollfd poll_fds[2];
 	socklen_t addrlen = sizeof(dgram_addr);
 
 	struct cli_args cli;
@@ -70,19 +72,36 @@ int main(int argc, char **argv) {
 	s1.sin_port = htons(68);
 	s1.sin_addr.s_addr = INADDR_BROADCAST;
 
+	poll_fds[0].fd = dhcpsrv.timer.tfd;
+	poll_fds[0].events = POLLIN;
+	poll_fds[1].fd = sfd;
+	poll_fds[1].events = POLLIN;
+
 	for (;;) {
-		memset(&dhcp_msg, 0, sizeof(msg_size));
-		msg_size = recvfrom(sfd, &dhcp_msg, sizeof(dhcp_msg), 0, &dgram_addr, &addrlen);
+		poll(poll_fds, 2, -1);
+		if (poll_fds[1].revents & POLLIN) {
+			memset(&dhcp_msg, 0, sizeof(msg_size));
+			msg_size = recvfrom(sfd, &dhcp_msg, sizeof(dhcp_msg), 0, &dgram_addr, &addrlen);
 
-		if (msg_size <= 0)
-			fprintf(stderr, "Error receiving the message (error %d)\n", errno);
+			if (msg_size <= 0)
+				fprintf(stderr, "Error receiving the message (error %d)\n", errno);
 
-		process_dhcp_msg(&dhcp_msg, &dhcp_resp, &dhcpsrv);
+			process_dhcp_msg(&dhcp_msg, &dhcp_resp, &dhcpsrv);
 
-		msg_size = sendto(sfd, &dhcp_resp, sizeof(dhcp_resp), 0, (const struct sockaddr *)&s1, sizeof(s1));
+			msg_size = sendto(sfd, &dhcp_resp, sizeof(dhcp_resp), 0, (const struct sockaddr *)&s1, sizeof(s1));
 
-		if (msg_size < 0)
-			fprintf(stderr, "Could not send message (error %d)\n", errno);
+			if (msg_size < 0)
+				fprintf(stderr, "Could not send message (error %d)\n", errno);
+		} else if (poll_fds[0].revents & POLLIN) {
+			static long __void;
+			struct lease *lease = &dhcpsrv.llist.lease_vec[dhcpsrv.timer.current_lease];
+			memset(lease, 0, sizeof(*lease));
+			lease->efd = -1;
+
+			timer_arm(&dhcpsrv.timer);
+
+			read(dhcpsrv.timer.tfd, &__void, 8);
+		}
 	};
 
 	close(sfd);

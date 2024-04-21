@@ -80,10 +80,11 @@ struct lease *get_new_lease(
 		for (int i = 0; i < srv->llist.len; i++) {
 			if (srv->llist.lease_vec[i].xid == dhcp_msg->xid) {
 				lease = &srv->llist.lease_vec[i];
-				lease->efd = 1;
+				lease->efd = srv->llist.max_lease_time;
 				break;
 			}
 		}
+		timer_arm(&srv->timer);
 
 		if (lease != NULL)
 			break;
@@ -139,7 +140,7 @@ void prepare_response(
 	for (int j = 0; j < parameter_request_list.len; j++) {
 		switch (parameter_request_list.ptr[j]) {
 		case RFC2131_OPTION_SUBNET_MASK:
-			i += write_option32(dhcp_resp->options + i, RFC2131_OPTION_SUBNET_MASK, srv->llist.netmask); break;
+			i += write_option32(dhcp_resp->options + i, RFC2131_OPTION_SUBNET_MASK, htonl(srv->llist.netmask)); break;
 		case RFC2131_OPTION_DOMAIN_NAME_SERVER:
 			i += write_option32(dhcp_resp->options + i, RFC2131_OPTION_DOMAIN_NAME_SERVER, srv->dns); break;
 		}
@@ -185,5 +186,6 @@ void create(struct cli_args *cli, struct dhcp_server *srv) {
 	else
 		netmask = srv->llist.netmask;
 
-	leaselist_init(&srv->llist, ntohl(address), netmask);
+	leaselist_init(&srv->llist, ntohl(address), ntohl(netmask));
+	timer_init(&srv->timer, &srv->llist);
 }

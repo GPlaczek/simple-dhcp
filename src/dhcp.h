@@ -4,10 +4,12 @@
 #include "rfc2131.h"
 #include "leases.h"
 #include "cli.h"
+#include "timer.h"
 
 struct dhcp_server {
 	in_addr_t gateway, dns;
 	struct leaselist llist;
+	struct timer timer;
 };
 
 void process_dhcp_msg(
