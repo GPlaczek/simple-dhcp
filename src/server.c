@@ -1,5 +1,4 @@
 #include "rfc2131.h"
-#include "leases.h"
 #include "dhcp.h"
 
 #include <stdio.h>
@@ -42,6 +41,7 @@ int main(int argc, char **argv) {
 	memset(&cli, 0, sizeof(cli));
 	parse_command_line(argc, argv, &cli);
 	struct dhcp_server dhcpsrv;
+	memset(&dhcpsrv, 0, sizeof(dhcpsrv));
 	create(&cli, &dhcpsrv);
 
 	sfd = socket(AF_INET, SOCK_DGRAM, 0);

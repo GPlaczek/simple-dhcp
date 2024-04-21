@@ -2,6 +2,7 @@
 #include "leases.h"
 #include "dhcp.h"
 #include "cli.h"
+#include "config.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -157,25 +158,32 @@ void process_dhcp_msg(
 
 void create(struct cli_args *cli, struct dhcp_server *srv) {
 	in_addr_t address, netmask;
+	if (cli->config_filename)
+		parse_config(cli->config_filename, srv);
+
 	if (cli->gateway)
 		srv->gateway = inet_addr(cli->gateway);
-	else
+	else if (!srv->gateway)
 		srv->gateway = inet_addr("192.168.1.1");
 
 	if (cli->dns)
 		srv->dns = inet_addr(cli->dns);
-	else
+	else if (!srv->dns)
 		srv->dns = inet_addr("8.8.8.8");
 
 	if (cli->address)
 		address = inet_addr(cli->address);
-	else
+	else if (!srv->llist.netaddr)
 		address = inet_addr("192.168.1.0");
+	else
+		address = srv->llist.netaddr;
 
 	if (cli->netmask)
 		netmask = inet_addr(cli->netmask);
-	else
+	else if (!srv->llist.netmask)
 		netmask = inet_addr("255.255.255.0");
+	else
+		netmask = srv->llist.netmask;
 
 	leaselist_init(&srv->llist, ntohl(address), netmask);
 }

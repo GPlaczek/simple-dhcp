@@ -1,4 +1,5 @@
 #include "cli.h"
+#include "config.h"
 
 #include <stdio.h>
 #include <getopt.h>
@@ -9,10 +10,10 @@
 
 struct option cli_opts[] = {
 	{"config", required_argument, NULL, 'c' },
-	{"gateway", required_argument, NULL, 'g' },
-	{"dns", required_argument, NULL, 'd' },
-	{"address", required_argument, NULL, 'a' },
-	{"netmask", required_argument, NULL, 'm' },
+	{CONFIG_GATEWAY, required_argument, NULL, 'g' },
+	{CONFIG_DNS, required_argument, NULL, 'd' },
+	{CONFIG_ADDRESS, required_argument, NULL, 'a' },
+	{CONFIG_NETMASK, required_argument, NULL, 'm' },
 	{NULL, 0, NULL, 0}
 };
 
