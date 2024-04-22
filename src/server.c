@@ -95,8 +95,7 @@ int main(int argc, char **argv) {
 		} else if (poll_fds[0].revents & POLLIN) {
 			static long __void;
 			struct lease *lease = &dhcpsrv.llist.lease_vec[dhcpsrv.timer.current_lease];
-			memset(lease, 0, sizeof(*lease));
-			lease->efd = -1;
+			lease->efd = LEASE_FREE;
 
 			timer_arm(&dhcpsrv.timer);
 

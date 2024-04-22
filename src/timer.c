@@ -17,8 +17,7 @@ int timer_init(struct timer *timer, struct leaselist *ll) {
 
 int timer_arm(struct timer *timer) {
 	struct itimerspec newtime, oldtime;
-	int err, ind;
-	long elapsed, mintime = -1;
+	int err, ind, elapsed, mintime = -1;
 	memset(&newtime, 0, sizeof(newtime));
 	memset(&oldtime, 0, sizeof(oldtime));
 

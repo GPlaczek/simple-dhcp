@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DEFAULT_LEASE_TIME  htonl(86400)
 
 struct dhcp_option {
 	uint8_t len;
@@ -78,7 +77,11 @@ struct lease *get_new_lease(
 	switch (msgtype) {
 	case RFC2131_OPTION_MSGTYPE_DHCPREQUEST:
 		for (int i = 0; i < srv->llist.len; i++) {
-			if (srv->llist.lease_vec[i].xid == dhcp_msg->xid) {
+			// Use a lease if it has been offered in the same transaction or if
+			// it was leased to the same hardware address before
+			if (srv->llist.lease_vec[i].xid == dhcp_msg->xid ||
+				!memcmp(srv->llist.lease_vec[i].chaddr, dhcp_msg->chaddr, dhcp_msg->hlen)
+			) {
 				lease = &srv->llist.lease_vec[i];
 				lease->efd = srv->llist.max_lease_time;
 				break;
@@ -88,9 +91,10 @@ struct lease *get_new_lease(
 
 		if (lease != NULL)
 			break;
+
 		// fall through
 	case RFC2131_OPTION_MSGTYPE_DHCPDISCOVER:
-		lease = leaselist_get_lease(&srv->llist);
+		lease = leaselist_get_lease(&srv->llist, dhcp_msg->chaddr, dhcp_msg->hlen);
 		lease->xid = dhcp_msg->xid;
 		memcpy(lease->chaddr, dhcp_msg->chaddr, 16);
 		goto exit;
@@ -122,7 +126,7 @@ void prepare_response(
 	memcpy(dhcp_resp->chaddr, dhcp_msg->chaddr, 16);
 	int i = 4;
 
-	if (lease->efd == -1) {
+	if (lease->efd == LEASE_OFFERED) {
 		dhcp_resp->ciaddr = 0;
 		i += write_option8(dhcp_resp->options + i, RFC2131_OPTION_MSGTYPE, RFC2131_OPTION_MSGTYPE_DHCPOFFER);
 	} else {
@@ -130,7 +134,7 @@ void prepare_response(
 		i += write_option8(dhcp_resp->options + i, RFC2131_OPTION_MSGTYPE, RFC2131_OPTION_MSGTYPE_DHCPACK);
 	}
 
-	i+= write_option32(dhcp_resp->options + i, RFC2131_OPTION_IP_ADDRESS_LEASE_TIME, DEFAULT_LEASE_TIME);
+	i+= write_option32(dhcp_resp->options + i, RFC2131_OPTION_IP_ADDRESS_LEASE_TIME, htonl((uint32_t)lease->efd));
 
 	if (client_id.len > 0) {
 		i+= write_option(dhcp_resp->options + i, RFC2131_OPTION_CLIENT_ID, client_id.ptr, client_id.len);

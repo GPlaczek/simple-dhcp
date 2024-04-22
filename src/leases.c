@@ -1,6 +1,7 @@
 #include "leases.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #define INITIAL_CAP 256
 
@@ -29,20 +30,29 @@ in_addr_t __ind_to_addr(struct leaselist *ll, unsigned int ind) {
 	return ind + ll->netaddr + 1;
 }
 
-struct lease *leaselist_get_lease(struct leaselist *ll) {
-	struct lease *lease = NULL;
+struct lease *leaselist_get_lease(struct leaselist *ll, uint8_t *hwaddr, uint8_t hwlen) {
+	struct lease *lease = NULL, *empty = NULL;
 
 	int i = 0;
+	for (
+		lease = &ll->lease_vec[i];
+		lease != NULL && memcmp(lease->chaddr, hwaddr, hwlen) && i < ll->len;
+		lease = &ll->lease_vec[++i]
+	) {
+		if (empty == NULL && lease != NULL && lease->efd == LEASE_FREE)
+			empty = lease;
+	}
 	if (ll->len < ll->net_size) {
 		i = ll->len;
 		lease = &ll->lease_vec[ll->len];
 		ll->len++;
-	} else {
-		for (lease = &ll->lease_vec[i]; lease->efd == -1; lease=&ll->lease_vec[++i]);
-	}
+	} else { lease = empty; }
+
+	if (lease == NULL)
+		return NULL;
 
 	lease->ipaddr = __ind_to_addr(ll, ll->len);
-	lease->efd = -1;
+	lease->efd = LEASE_OFFERED;
 
 	return lease;
 }
