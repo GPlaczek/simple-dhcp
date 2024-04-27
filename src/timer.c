@@ -15,7 +15,7 @@ int timer_init(struct timer *timer, struct leaselist *ll) {
 	return 0;
 }
 
-int timer_arm(struct timer *timer) {
+int timer_arm(struct timer *timer, struct lease *lease) {
 	struct itimerspec newtime, oldtime;
 	int err, ind, elapsed, mintime = -1;
 	memset(&newtime, 0, sizeof(newtime));
@@ -31,7 +31,8 @@ int timer_arm(struct timer *timer) {
 		if (timer->ll->lease_vec[i].efd < 0)
 			continue;
 
-		timer->ll->lease_vec[i].efd -= elapsed;
+		if (&timer->ll->lease_vec[i] != lease)
+			timer->ll->lease_vec[i].efd -= elapsed;
 
 		if (timer->ll->lease_vec[i].efd < mintime || mintime < 0) {
 			mintime = timer->ll->lease_vec[i].efd;

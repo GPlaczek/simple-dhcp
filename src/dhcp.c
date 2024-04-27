@@ -86,7 +86,7 @@ struct lease *get_new_lease(
 				break;
 			}
 		}
-		timer_arm(&srv->timer);
+		timer_arm(&srv->timer, lease);
 
 		if (lease != NULL)
 			break;

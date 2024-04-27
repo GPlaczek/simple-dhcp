@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
 			struct lease *lease = &dhcpsrv.llist.lease_vec[dhcpsrv.timer.current_lease];
 			lease->efd = LEASE_FREE;
 
-			timer_arm(&dhcpsrv.timer);
+			timer_arm(&dhcpsrv.timer, NULL);
 
 			read(dhcpsrv.timer.tfd, &__void, 8);
 		}
