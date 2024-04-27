@@ -17,12 +17,12 @@ struct lease {
 
 struct leaselist {
 	in_addr_t netaddr, netmask;
-	long max_lease_time;
+	int max_lease_time;
 	struct lease *lease_vec;
 	int len, cap, net_size;
 };
 
-void leaselist_init(struct leaselist *ll, in_addr_t na, in_addr_t nm);
+void leaselist_init(struct leaselist *ll);
 struct lease *leaselist_get_lease(struct leaselist *ll, uint8_t *hwaddr, uint8_t hwlen);
 
 #endif // leaselist_h_INCLUDED

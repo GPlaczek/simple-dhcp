@@ -1,5 +1,6 @@
 #include "rfc2131.h"
 #include "dhcp.h"
+#include "cli.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -39,7 +40,7 @@ int main(int argc, char **argv) {
 	struct pollfd poll_fds[2];
 	socklen_t addrlen = sizeof(dgram_addr);
 
-	struct cli_args cli;
+	struct dhcp_args cli;
 	memset(&cli, 0, sizeof(cli));
 	parse_command_line(argc, argv, &cli);
 	struct dhcp_server dhcpsrv;

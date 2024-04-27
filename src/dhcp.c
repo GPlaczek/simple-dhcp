@@ -1,7 +1,6 @@
 #include "rfc2131.h"
 #include "leases.h"
 #include "dhcp.h"
-#include "cli.h"
 #include "config.h"
 
 #include <stdint.h>
@@ -161,35 +160,70 @@ void process_dhcp_msg(
 	prepare_response(dhcp_msg, dhcp_resp, srv, lease);
 }
 
-void create(struct cli_args *cli, struct dhcp_server *srv) {
-	in_addr_t address, netmask;
-	if (cli->config_filename)
-		parse_config(cli->config_filename, srv);
+#define PROCESS_ARG(TYPE, NAME) \
+void __process_arg_##NAME( \
+	const char *restrict arg1, \
+	const char *restrict arg2, \
+	TYPE *target, \
+	TYPE (*func) (const char *), \
+	TYPE def \
+) { \
+	const char *op = NULL; \
+	if (arg1) \
+		op = arg1; \
+	else if (arg2) \
+		op = arg2; \
+	if (op != NULL) { \
+		*target = func(op); \
+	} else { \
+		*target = def; \
+	} \
+}
+PROCESS_ARG(in_addr_t, addr)
+PROCESS_ARG(int, int)
 
-	if (cli->gateway)
-		srv->gateway = inet_addr(cli->gateway);
-	else if (!srv->gateway)
-		srv->gateway = inet_addr("192.168.1.1");
+int parse_time(const char *time) {
+	char *unit;
+	int __time = strtol(time, &unit, 10);
+	if (unit == NULL)
+		return -1;
 
-	if (cli->dns)
-		srv->dns = inet_addr(cli->dns);
-	else if (!srv->dns)
-		srv->dns = inet_addr("8.8.8.8");
+	int mul = 1;
+	switch (*unit) {
+	case 's': mul = 1; break;
+	case 'm': mul = 60; break;
+	case 'h': mul = 3600; break;
+	case 'd': mul = 86400; break;
+	default: return -1;
+	}
 
-	if (cli->address)
-		address = inet_addr(cli->address);
-	else if (!srv->llist.netaddr)
-		address = inet_addr("192.168.1.0");
-	else
-		address = srv->llist.netaddr;
+	return __time * mul;
+}
 
-	if (cli->netmask)
-		netmask = inet_addr(cli->netmask);
-	else if (!srv->llist.netmask)
-		netmask = inet_addr("255.255.255.0");
-	else
-		netmask = srv->llist.netmask;
+void create(struct dhcp_args *cli, struct dhcp_server *srv) {
+	struct dhcp_args conf;
+	memset(&conf, 0, sizeof(conf));
+	if (cli->config_filename != NULL)
+		parse_config(cli->config_filename, &conf);
 
-	leaselist_init(&srv->llist, ntohl(address), ntohl(netmask));
+	__process_arg_addr(cli->gateway, conf.gateway,
+		&srv->gateway, inet_addr, inet_addr("192.168.1.1"));
+	__process_arg_addr(cli->dns, conf.dns,
+		&srv->dns, inet_addr, inet_addr("8.8.8.8"));
+	__process_arg_addr(cli->address, conf.address,
+		&srv->llist.netaddr, inet_network, inet_network("192.168.1.0"));
+	__process_arg_addr(cli->netmask, conf.netmask,
+		&srv->llist.netmask, inet_network, inet_network("255.255.255.0"));
+	__process_arg_int(cli->lease_time, conf.lease_time,
+		&srv->llist.max_lease_time, parse_time, 3600);
+
+	char **chr_view = (char **)&conf;
+	for (size_t i = 0; i < sizeof(struct dhcp_args) / sizeof(char *); i++) {
+		if (chr_view[i] != NULL)
+			free(chr_view[i]);
+	}
+
+	// TODO: ntohl for netaddr and netmask
+	leaselist_init(&srv->llist);
 	timer_init(&srv->timer, &srv->llist);
 }

@@ -5,18 +5,15 @@
 
 #define INITIAL_CAP 256
 
-void leaselist_init(struct leaselist *ll, in_addr_t na, in_addr_t nm) {
-	ll->netaddr = na;
-	ll->netmask = nm;
+void leaselist_init(struct leaselist *ll) {
 
 	unsigned int initial_cap, net_size;
-	net_size = ~nm;
+	net_size = ~ll->netmask;
 	if (net_size > INITIAL_CAP)
 		initial_cap = INITIAL_CAP;
 	else
 		initial_cap = net_size;
 
-	ll->max_lease_time = 30;  // TODO: make this configurable with a reasonable default
 	ll->lease_vec = malloc(sizeof(struct lease) * initial_cap);
 	ll->cap = initial_cap;
 	ll->net_size = net_size;
