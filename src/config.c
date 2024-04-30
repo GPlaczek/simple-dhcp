@@ -39,6 +39,8 @@ int parse_config(const char *config_path, struct dhcp_args *args) {
 			target = &args->dns;
 		} else if (!strncmp(key, CONFIG_LEASE_TIME, sizeof(CONFIG_LEASE_TIME) - 1)) {
 			target = &args->lease_time;
+		} else if (!strncmp(key, CONFIG_LOG_LEVEL, sizeof(CONFIG_LOG_LEVEL) - 1)) {
+			target = &args->log_level;
 		}
 
 		if (target == NULL)

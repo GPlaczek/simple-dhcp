@@ -8,6 +8,7 @@
 #define CONFIG_NETMASK    "netmask"
 #define CONFIG_DNS        "dns"
 #define CONFIG_LEASE_TIME "lease-time"
+#define CONFIG_LOG_LEVEL  "log-level"
 
 int parse_config(const char *config_path, struct dhcp_args *args);
 

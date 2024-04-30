@@ -6,7 +6,7 @@
 #include "timer.h"
 
 struct dhcp_args {
-	char *config_filename, *gateway, *dns, *address, *netmask, *lease_time;
+	char *config_filename, *gateway, *dns, *address, *netmask, *lease_time, *log_level;
 };
 
 struct dhcp_server {

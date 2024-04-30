@@ -11,11 +11,14 @@
 #define LOGLEVEL_ERROR 1
 
 extern const char *LOG_LABELS[];
+extern const size_t LOG_LABELS_LEN;
 
 #define LOG(LEVEL, fmt, ...) printf("[%s] " fmt, LOG_LABELS[LEVEL-1], ##__VA_ARGS__)
 #define LOG_HADDR(LEVEL, HADDR, fmt, ...) LOG(LEVEL, "[%s] " fmt, HADDR, ##__VA_ARGS__)
 
+void set_log_level(int level);
 int human_readable_haddr(char *restrict buf, const uint8_t *restrict haddr, uint8_t halen);
+
 void vfslog(int level, const char *restrict *fields, int flen, const char *restrict fmt, va_list args);
 void vslog(int level, const char *fmt, va_list args);
 void slog(int level, const char *fmt, ...);

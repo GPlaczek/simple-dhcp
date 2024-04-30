@@ -238,8 +238,23 @@ void __log_ip_n(const char *target, in_addr_t addr) {
 		target, u8v[0], u8v[1], u8v[2], u8v[3]);
 }
 
+int __log_level(const char *lv) {
+	int level = -1;
+
+	for(size_t i = 0; i < LOG_LABELS_LEN; i++) {
+		if (!strncmp(LOG_LABELS[i], lv, sizeof(*LOG_LABELS[i]))) {
+			level = i+1;
+			break;
+		}
+	}
+
+	return level;
+}
+
 void create(struct dhcp_args *cli, struct dhcp_server *srv) {
 	struct dhcp_args conf;
+	int loglevel = LOGLEVEL_INFO;
+
 	memset(&conf, 0, sizeof(conf));
 	if (cli->config_filename != NULL)
 		parse_config(cli->config_filename, &conf);
@@ -259,6 +274,10 @@ void create(struct dhcp_args *cli, struct dhcp_server *srv) {
 	__process_arg_int(cli->lease_time, conf.lease_time,
 		&srv->llist.max_lease_time, parse_time, 3600);
 	slog(LOGLEVEL_INFO, "lease time is %ds\n", srv->llist.max_lease_time);
+	__process_arg_int(cli->log_level, conf.log_level,
+		&loglevel, __log_level, LOGLEVEL_INFO);
+	slog(LOGLEVEL_INFO, "setting log level to %s\n", LOG_LABELS[loglevel-1]);
+	set_log_level(loglevel);
 
 	char **chr_view = (char **)&conf;
 	for (size_t i = 0; i < sizeof(struct dhcp_args) / sizeof(char *); i++) {

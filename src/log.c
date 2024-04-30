@@ -9,13 +9,19 @@
 #define LOG_LINE_BUFFER_LEN 4096
 
 char line_buffer[LOG_LINE_BUFFER_LEN];
-
 const char *LOG_LABELS[] = {
 	"ERROR",
 	"WARN ",
 	"INFO ",
 	"DEBUG"
 };
+const size_t LOG_LABELS_LEN = sizeof(LOG_LABELS) / sizeof(LOG_LABELS[0]);
+
+int log_level = LOGLEVEL_INFO;
+
+void set_log_level(int level) {
+	log_level = level;
+}
 
 int human_readable_haddr(char *restrict buf, const uint8_t *restrict haddr, uint8_t halen) {
 	int written = 0, len = 0;
@@ -34,6 +40,9 @@ void vfslog(int level, const char *restrict *fields, int flen, const char *restr
 	struct timespec tms;
 	struct tm tmi;
 	int written = 0, len = 0, i = 0;
+
+	if (level > log_level)
+		return;
 
 	clock_gettime(CLOCK_REALTIME, &tms);
 	localtime_r(&tms.tv_sec, &tmi);

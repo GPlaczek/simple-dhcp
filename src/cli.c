@@ -16,12 +16,13 @@ struct option cli_opts[] = {
 	{CONFIG_ADDRESS, required_argument, NULL, 'a' },
 	{CONFIG_NETMASK, required_argument, NULL, 'm' },
 	{CONFIG_LEASE_TIME, required_argument, NULL, 't' },
+	{CONFIG_LOG_LEVEL, required_argument, NULL, 'l' },
 	{NULL, 0, NULL, 0}
 };
 
 void parse_command_line(int argc, char *argv[], struct dhcp_args *args) {
 	char c;
-	while ((c = getopt_long(argc, argv, "c:g:d:a:m:", cli_opts, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, "c:g:d:a:m:t:l:", cli_opts, NULL)) != -1) {
 		switch (c) {
 		case 'c': args->config_filename = optarg; break;
 		case 'g': args->gateway = optarg; break;
@@ -29,6 +30,7 @@ void parse_command_line(int argc, char *argv[], struct dhcp_args *args) {
 		case 'a': args->address = optarg; break;
 		case 'm': args->netmask = optarg; break;
 		case 't': args->lease_time = optarg; break;
+		case 'l': args->log_level = optarg; break;
 		}
 	}
 }
