@@ -1,4 +1,5 @@
 #include "timer.h"
+#include "log.h"
 
 #include <sys/timerfd.h>
 #include <string.h>
@@ -45,6 +46,7 @@ int timer_arm(struct timer *timer, struct lease *lease) {
 	newtime.it_value.tv_sec = mintime;
 	timer->last_armed = mintime;
 	timer->current_lease = ind;
+	slog(LOGLEVEL_DEBUG, "Arming timer to %lds\n", newtime.it_value.tv_sec);
 	err = timerfd_settime(timer->tfd, 0, &newtime, NULL);
 	if (err < 0)
 		return 1;

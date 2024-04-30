@@ -2,6 +2,7 @@
 #include "leases.h"
 #include "dhcp.h"
 #include "config.h"
+#include "log.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -41,13 +42,22 @@ struct lease *get_new_lease(
 	struct rfc2131_dhcp_msg *dhcp_msg,
 	struct dhcp_server *srv
 ) {
+	in_addr_t __addr;
+	uint8_t *__u8v;
+	char *human_haddr = malloc(64);  // TODO: macro
+	human_readable_haddr(human_haddr, dhcp_msg->chaddr, dhcp_msg->hlen);
+	hslog(LOGLEVEL_DEBUG, human_haddr, "Got message\n");
 	struct lease *lease = NULL;
 
-	if (dhcp_msg->op != RFC2131_OP_BOOTREQUEST)
+	if (dhcp_msg->op != RFC2131_OP_BOOTREQUEST) {
+		hslog(LOGLEVEL_WARN, human_haddr, "Invalid dhcp operation type\n");
 		goto exit;
+	}
 
-	if (*(uint32_t *)dhcp_msg->options != RFC2131_MAGIC_COOKIE)
+	if (*(uint32_t *)dhcp_msg->options != RFC2131_MAGIC_COOKIE) {
+		hslog(LOGLEVEL_WARN, human_haddr, "Invalid magic cookie\n");
 		goto exit;
+	}
 
 	uint8_t *option_ptr = dhcp_msg->options + 4;
 	uint8_t msgtype = 0;
@@ -75,6 +85,7 @@ struct lease *get_new_lease(
 
 	switch (msgtype) {
 	case RFC2131_OPTION_MSGTYPE_DHCPREQUEST:
+		hslog(LOGLEVEL_INFO, human_haddr, "DHCPREQUEST\n");
 		for (int i = 0; i < srv->llist.len; i++) {
 			// Use a lease if it has been offered in the same transaction or if
 			// it was leased to the same hardware address before
@@ -88,13 +99,27 @@ struct lease *get_new_lease(
 		}
 		timer_arm(&srv->timer, lease);
 
-		if (lease != NULL)
-			break;
+		if (lease == NULL) {
+			lease = leaselist_get_lease(&srv->llist, dhcp_msg->chaddr, dhcp_msg->hlen);
+			lease->xid = dhcp_msg->xid;
+			memcpy(lease->chaddr, dhcp_msg->chaddr, 16);
+			goto exit;
+		}
 
-		// fall through
+		__addr = htonl(lease->ipaddr);
+		__u8v = (uint8_t *)&__addr;
+		hslog(LOGLEVEL_INFO, human_haddr, "Leasing %d.%d.%d.%d (xid: %d)\n",
+			__u8v[0], __u8v[1], __u8v[2], __u8v[3], lease->xid);
+
+		break;
 	case RFC2131_OPTION_MSGTYPE_DHCPDISCOVER:
+		hslog(LOGLEVEL_INFO, human_haddr, "DHCPDISCOVER\n");
 		lease = leaselist_get_lease(&srv->llist, dhcp_msg->chaddr, dhcp_msg->hlen);
 		lease->xid = dhcp_msg->xid;
+		__addr = htonl(lease->ipaddr);
+		__u8v = (uint8_t *)&__addr;
+		hslog(LOGLEVEL_INFO, human_haddr, "Offering %d.%d.%d.%d (xid: %d)\n",
+			__u8v[0], __u8v[1], __u8v[2], __u8v[3], lease->xid);
 		memcpy(lease->chaddr, dhcp_msg->chaddr, 16);
 		goto exit;
 	case RFC2131_OPTION_MSGTYPE_DHCPDECLINE:
@@ -105,6 +130,7 @@ struct lease *get_new_lease(
 		goto exit;
 	}
 exit:
+	free(human_haddr);
 	return lease;
 }
 
@@ -200,6 +226,18 @@ int parse_time(const char *time) {
 	return __time * mul;
 }
 
+void __log_ip_h(const char *target, in_addr_t addr) {
+	uint8_t *u8v = (uint8_t *)&addr;
+	slog(LOGLEVEL_INFO, "%s is %d.%d.%d.%d\n",
+		target, u8v[3], u8v[2], u8v[1], u8v[0]);
+}
+
+void __log_ip_n(const char *target, in_addr_t addr) {
+	uint8_t *u8v = (uint8_t *)&addr;
+	slog(LOGLEVEL_INFO, "%s is %d.%d.%d.%d\n",
+		target, u8v[0], u8v[1], u8v[2], u8v[3]);
+}
+
 void create(struct dhcp_args *cli, struct dhcp_server *srv) {
 	struct dhcp_args conf;
 	memset(&conf, 0, sizeof(conf));
@@ -208,14 +246,19 @@ void create(struct dhcp_args *cli, struct dhcp_server *srv) {
 
 	__process_arg_addr(cli->gateway, conf.gateway,
 		&srv->gateway, inet_addr, inet_addr("192.168.1.1"));
+	__log_ip_n("gateway", srv->gateway);
 	__process_arg_addr(cli->dns, conf.dns,
 		&srv->dns, inet_addr, inet_addr("8.8.8.8"));
+	__log_ip_n("dns", srv->dns);
 	__process_arg_addr(cli->address, conf.address,
 		&srv->llist.netaddr, inet_network, inet_network("192.168.1.0"));
+	__log_ip_h("network address", srv->llist.netaddr);
 	__process_arg_addr(cli->netmask, conf.netmask,
 		&srv->llist.netmask, inet_network, inet_network("255.255.255.0"));
+	__log_ip_h("netmask is", srv->llist.netmask);
 	__process_arg_int(cli->lease_time, conf.lease_time,
 		&srv->llist.max_lease_time, parse_time, 3600);
+	slog(LOGLEVEL_INFO, "lease time is %ds\n", srv->llist.max_lease_time);
 
 	char **chr_view = (char **)&conf;
 	for (size_t i = 0; i < sizeof(struct dhcp_args) / sizeof(char *); i++) {
@@ -223,7 +266,6 @@ void create(struct dhcp_args *cli, struct dhcp_server *srv) {
 			free(chr_view[i]);
 	}
 
-	// TODO: ntohl for netaddr and netmask
 	leaselist_init(&srv->llist);
 	timer_init(&srv->timer, &srv->llist);
 }

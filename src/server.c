@@ -1,6 +1,7 @@
 #include "rfc2131.h"
 #include "dhcp.h"
 #include "cli.h"
+#include "log.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -55,14 +56,14 @@ int main(int argc, char **argv) {
 	sockopt=1;
 	err = setsockopt(sfd, SOL_SOCKET, SO_BROADCAST, &sockopt, sizeof(sockopt));
 	if (err < 0) {
-		fprintf(stderr, "Could not set socket broadcast option (error %d)\n", errno);
+		slog(LOGLEVEL_ERROR, "Could not set socket broadcast option (error %d)\n", errno);
 		return 1;
 	}
 
 	struct sockaddr_in bind_addr = { AF_INET, htons(67), INADDR_ANY, 0 };
 	err = bind(sfd, (struct sockaddr*) &bind_addr, sizeof(bind_addr));
 	if (err < 0) {
-		fprintf(stderr, "Could not bind to the given address (error %d)\n", errno);
+		slog(LOGLEVEL_ERROR, "Could not bind to the given address (error %d)\n", errno);
 		return 1;
 	}
 
@@ -96,7 +97,12 @@ int main(int argc, char **argv) {
 		} else if (poll_fds[0].revents & POLLIN) {
 			static long __void;
 			struct lease *lease = &dhcpsrv.llist.lease_vec[dhcpsrv.timer.current_lease];
+			slog(LOGLEVEL_DEBUG, "Timer has fired\n");
 			lease->efd = LEASE_FREE;
+			in_addr_t __addr = htonl(lease->ipaddr);
+			uint8_t *__u8v = (uint8_t *)&__addr;
+			slog(LOGLEVEL_INFO, "Freeing lease for %d.%d.%d.%d\n",
+				__u8v[0], __u8v[1], __u8v[2], __u8v[3]);
 
 			timer_arm(&dhcpsrv.timer, NULL);
 

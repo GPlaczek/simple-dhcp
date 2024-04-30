@@ -13,6 +13,7 @@ struct lease {
 	in_addr_t ipaddr;
 	uint8_t chaddr[16];
 	int efd;
+	char *human_chaddr;
 };
 
 struct leaselist {
