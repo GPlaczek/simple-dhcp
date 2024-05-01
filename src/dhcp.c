@@ -51,12 +51,12 @@ struct lease *get_new_lease(
 
 	if (dhcp_msg->op != RFC2131_OP_BOOTREQUEST) {
 		hslog(LOGLEVEL_WARN, human_haddr, "Invalid dhcp operation type\n");
-		goto exit;
+		goto get_new_lease_exit;
 	}
 
 	if (*(uint32_t *)dhcp_msg->options != RFC2131_MAGIC_COOKIE) {
 		hslog(LOGLEVEL_WARN, human_haddr, "Invalid magic cookie\n");
-		goto exit;
+		goto get_new_lease_exit;
 	}
 
 	uint8_t *option_ptr = dhcp_msg->options + 4;
@@ -103,7 +103,7 @@ struct lease *get_new_lease(
 			lease = leaselist_get_lease(&srv->llist, dhcp_msg->chaddr, dhcp_msg->hlen);
 			lease->xid = dhcp_msg->xid;
 			memcpy(lease->chaddr, dhcp_msg->chaddr, 16);
-			goto exit;
+			goto get_new_lease_exit;
 		}
 
 		__addr = htonl(lease->ipaddr);
@@ -121,15 +121,15 @@ struct lease *get_new_lease(
 		hslog(LOGLEVEL_INFO, human_haddr, "Offering %d.%d.%d.%d (xid: %d)\n",
 			__u8v[0], __u8v[1], __u8v[2], __u8v[3], lease->xid);
 		memcpy(lease->chaddr, dhcp_msg->chaddr, 16);
-		goto exit;
+		goto get_new_lease_exit;
 	case RFC2131_OPTION_MSGTYPE_DHCPDECLINE:
 	case RFC2131_OPTION_MSGTYPE_DHCPRELEASE:
 	case RFC2131_OPTION_MSGTYPE_DHCPINFORM:
 	default:
 		// Invalid dhcp option
-		goto exit;
+		goto get_new_lease_exit;
 	}
-exit:
+get_new_lease_exit:
 	free(human_haddr);
 	return lease;
 }
@@ -140,8 +140,19 @@ void prepare_response(
 	struct dhcp_server *srv,
 	struct lease *lease
 ) {
-	if (lease == NULL)
-		return;
+	int i = 4;
+
+	if (lease == NULL) {
+		dhcp_resp->ciaddr = 0;
+		i += write_option8(dhcp_resp->options + i, RFC2131_OPTION_MSGTYPE, RFC2131_OPTION_MSGTYPE_DHCPNAK);
+		goto prepare_response_exit;
+	} else if (lease->efd == LEASE_OFFERED) {
+		dhcp_resp->ciaddr = 0;
+		i += write_option8(dhcp_resp->options + i, RFC2131_OPTION_MSGTYPE, RFC2131_OPTION_MSGTYPE_DHCPOFFER);
+	} else {
+		dhcp_resp->ciaddr = dhcp_msg->ciaddr;
+		i += write_option8(dhcp_resp->options + i, RFC2131_OPTION_MSGTYPE, RFC2131_OPTION_MSGTYPE_DHCPACK);
+	}
 
 	dhcp_resp->htype = dhcp_msg->htype;
 	dhcp_resp->hlen = dhcp_msg->hlen;
@@ -149,15 +160,6 @@ void prepare_response(
 	dhcp_resp->yiaddr = htonl(lease->ipaddr);
 	dhcp_resp->giaddr = dhcp_msg->giaddr;
 	memcpy(dhcp_resp->chaddr, dhcp_msg->chaddr, 16);
-	int i = 4;
-
-	if (lease->efd == LEASE_OFFERED) {
-		dhcp_resp->ciaddr = 0;
-		i += write_option8(dhcp_resp->options + i, RFC2131_OPTION_MSGTYPE, RFC2131_OPTION_MSGTYPE_DHCPOFFER);
-	} else {
-		dhcp_resp->ciaddr = dhcp_msg->ciaddr;
-		i += write_option8(dhcp_resp->options + i, RFC2131_OPTION_MSGTYPE, RFC2131_OPTION_MSGTYPE_DHCPACK);
-	}
 
 	i+= write_option32(dhcp_resp->options + i, RFC2131_OPTION_IP_ADDRESS_LEASE_TIME, htonl((uint32_t)lease->efd));
 
@@ -174,6 +176,8 @@ void prepare_response(
 			i += write_option32(dhcp_resp->options + i, RFC2131_OPTION_DOMAIN_NAME_SERVER, srv->dns); break;
 		}
 	}
+
+prepare_response_exit:
 	dhcp_resp->options[i++] = 0xff;
 }
 
