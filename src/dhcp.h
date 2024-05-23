@@ -4,10 +4,7 @@
 #include "rfc2131.h"
 #include "leases.h"
 #include "timer.h"
-
-struct dhcp_args {
-	char *config_filename, *gateway, *dns, *address, *netmask, *lease_time, *log_level;
-};
+#include "config.h"
 
 struct dhcp_server {
 	in_addr_t gateway, dns;
@@ -20,7 +17,7 @@ void process_dhcp_msg(
 	struct rfc2131_dhcp_msg *dhcp_resp,
 	struct dhcp_server *srv
 );
-void create(struct dhcp_args *cli, struct dhcp_server *srv);
 void del(struct dhcp_server *srv);
+void configure(struct dhcp_server *srv, struct dhcp_config *conf);
 
 #endif // dhcp_h_INCLUDED

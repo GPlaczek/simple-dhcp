@@ -1,5 +1,6 @@
 #include "rfc2131.h"
 #include "dhcp.h"
+#include "config.h"
 #include "cli.h"
 #include "log.h"
 
@@ -13,6 +14,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <net/if.h>
 
 
 struct rfc2131_dhcp_msg dhcp_msg, dhcp_resp;
@@ -40,13 +42,18 @@ int main(int argc, char **argv) {
 	struct sockaddr dgram_addr;
 	struct pollfd poll_fds[2];
 	socklen_t addrlen = sizeof(dgram_addr);
-
 	struct dhcp_args cli;
+	struct dhcp_config config;
+	struct dhcp_server dhcpsrv;
+
 	memset(&cli, 0, sizeof(cli));
 	parse_command_line(argc, argv, &cli);
-	struct dhcp_server dhcpsrv;
+
+	memset(&config, 0, sizeof(config));
+	get_dhcp_config(&cli, &config);
+
 	memset(&dhcpsrv, 0, sizeof(dhcpsrv));
-	create(&cli, &dhcpsrv);
+	configure(&dhcpsrv, &config);
 
 	sfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sfd < 0) {
@@ -65,6 +72,19 @@ int main(int argc, char **argv) {
 	if (err < 0) {
 		slog(LOGLEVEL_ERROR, "Could not bind to the given address (error %d)\n", errno);
 		return 1;
+	}
+
+	if (config.net_interface[0] != 0) {
+		size_t len = strlen(config.net_interface);
+
+		slog(LOGLEVEL_INFO, "Binding to interface %s\n", config.net_interface);
+		err = setsockopt(sfd, SOL_SOCKET, SO_BINDTODEVICE, config.net_interface, len);
+
+		if (err < 0) {
+			slog(LOGLEVEL_ERROR, "Could not bind socket to the given interface (error %d)\n", errno);
+			return 1;
+		}
+
 	}
 
 	init_dhcp_resp();

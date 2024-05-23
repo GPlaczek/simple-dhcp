@@ -190,104 +190,13 @@ void process_dhcp_msg(
 	prepare_response(dhcp_msg, dhcp_resp, srv, lease);
 }
 
-#define PROCESS_ARG(TYPE, NAME) \
-void __process_arg_##NAME( \
-	const char *restrict arg1, \
-	const char *restrict arg2, \
-	TYPE *target, \
-	TYPE (*func) (const char *), \
-	TYPE def \
-) { \
-	const char *op = NULL; \
-	if (arg1) \
-		op = arg1; \
-	else if (arg2) \
-		op = arg2; \
-	if (op != NULL) { \
-		*target = func(op); \
-	} else { \
-		*target = def; \
-	} \
-}
-PROCESS_ARG(in_addr_t, addr)
-PROCESS_ARG(int, int)
+void configure(struct dhcp_server *srv, struct dhcp_config *conf) {
+	srv->gateway = conf->gateway;
+	srv->dns = conf->dns;
 
-int parse_time(const char *time) {
-	char *unit;
-	int __time = strtol(time, &unit, 10);
-	if (unit == NULL)
-		return -1;
-
-	int mul = 1;
-	switch (*unit) {
-	case 's': mul = 1; break;
-	case 'm': mul = 60; break;
-	case 'h': mul = 3600; break;
-	case 'd': mul = 86400; break;
-	default: return -1;
-	}
-
-	return __time * mul;
-}
-
-void __log_ip_h(const char *target, in_addr_t addr) {
-	uint8_t *u8v = (uint8_t *)&addr;
-	slog(LOGLEVEL_INFO, "%s is %d.%d.%d.%d\n",
-		target, u8v[3], u8v[2], u8v[1], u8v[0]);
-}
-
-void __log_ip_n(const char *target, in_addr_t addr) {
-	uint8_t *u8v = (uint8_t *)&addr;
-	slog(LOGLEVEL_INFO, "%s is %d.%d.%d.%d\n",
-		target, u8v[0], u8v[1], u8v[2], u8v[3]);
-}
-
-int __log_level(const char *lv) {
-	int level = -1;
-
-	for(size_t i = 0; i < LOG_LABELS_LEN; i++) {
-		if (!strncmp(LOG_LABELS[i], lv, sizeof(*LOG_LABELS[i]))) {
-			level = i+1;
-			break;
-		}
-	}
-
-	return level;
-}
-
-void create(struct dhcp_args *cli, struct dhcp_server *srv) {
-	struct dhcp_args conf;
-	int loglevel = LOGLEVEL_INFO;
-
-	memset(&conf, 0, sizeof(conf));
-	if (cli->config_filename != NULL)
-		parse_config(cli->config_filename, &conf);
-
-	__process_arg_addr(cli->gateway, conf.gateway,
-		&srv->gateway, inet_addr, inet_addr("192.168.1.1"));
-	__log_ip_n("gateway", srv->gateway);
-	__process_arg_addr(cli->dns, conf.dns,
-		&srv->dns, inet_addr, inet_addr("8.8.8.8"));
-	__log_ip_n("dns", srv->dns);
-	__process_arg_addr(cli->address, conf.address,
-		&srv->llist.netaddr, inet_network, inet_network("192.168.1.0"));
-	__log_ip_h("network address", srv->llist.netaddr);
-	__process_arg_addr(cli->netmask, conf.netmask,
-		&srv->llist.netmask, inet_network, inet_network("255.255.255.0"));
-	__log_ip_h("netmask is", srv->llist.netmask);
-	__process_arg_int(cli->lease_time, conf.lease_time,
-		&srv->llist.max_lease_time, parse_time, 3600);
-	slog(LOGLEVEL_INFO, "lease time is %ds\n", srv->llist.max_lease_time);
-	__process_arg_int(cli->log_level, conf.log_level,
-		&loglevel, __log_level, LOGLEVEL_INFO);
-	slog(LOGLEVEL_INFO, "setting log level to %s\n", LOG_LABELS[loglevel-1]);
-	set_log_level(loglevel);
-
-	char **chr_view = (char **)&conf;
-	for (size_t i = 0; i < sizeof(struct dhcp_args) / sizeof(char *); i++) {
-		if (chr_view[i] != NULL)
-			free(chr_view[i]);
-	}
+	srv->llist.netaddr = conf->address;
+	srv->llist.netmask = conf->netmask;
+	srv->llist.max_lease_time = conf->lease_time;
 
 	leaselist_init(&srv->llist);
 	timer_init(&srv->timer, &srv->llist);
