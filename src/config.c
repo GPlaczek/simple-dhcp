@@ -56,6 +56,8 @@ int parse_config(const char *config_path, struct dhcp_args *args) {
 		strcpy(*target, value);
 	}
 
+	free(line);
+
 	return 0;
 }
 
