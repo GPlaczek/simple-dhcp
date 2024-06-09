@@ -155,6 +155,11 @@ int process_dhcp_msg(
 	case RFC2131_OPTION_MSGTYPE_DHCPDISCOVER:
 		hslog(LOGLEVEL_INFO, human_haddr, "DHCPDISCOVER\n");
 		lease = leaselist_get_lease(&srv->llist, dhcp_msg->chaddr, dhcp_msg->hlen);
+		if (lease == NULL) {
+			write_response(dhcp_msg, dhcp_resp, srv, lease, RFC2131_OPTION_MSGTYPE_DHCPNAK);
+			return 1;
+		}
+
 		lease->xid = dhcp_msg->xid;
 		__addr = htonl(lease->ipaddr);
 		__u8v = (uint8_t *)&__addr;
