@@ -4,8 +4,10 @@
 #include <stdint.h>
 #include <arpa/inet.h>
 
-#define LEASE_FREE    -1
-#define LEASE_OFFERED -2
+#define LEASE_FREE     -1
+#define LEASE_OFFERED  -2
+#define LEASE_DECLINED -3
+#define LEASE_RELEASED -4
 
 
 struct lease {
@@ -25,5 +27,6 @@ struct leaselist {
 
 void leaselist_init(struct leaselist *ll);
 struct lease *leaselist_get_lease(struct leaselist *ll, uint8_t *hwaddr, uint8_t hwlen);
+struct lease *leaselist_find_lease(struct leaselist *ll, uint8_t *hwaddr, uint8_t hwlen, uint32_t xid);
 
 #endif // leaselist_h_INCLUDED

@@ -3,4 +3,4 @@ From: debian:bookworm
 
 %post
 	apt-get -y update
-	apt-get -qqy install iproute2 psmisc procps isc-dhcp-client
+	apt-get -qqy install iproute2 psmisc procps isc-dhcp-client dhcpcd

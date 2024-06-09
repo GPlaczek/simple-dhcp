@@ -12,7 +12,7 @@ struct dhcp_server {
 	struct timer timer;
 };
 
-void process_dhcp_msg(
+int process_dhcp_msg(
 	struct rfc2131_dhcp_msg *dhcp_msg,
 	struct rfc2131_dhcp_msg *dhcp_resp,
 	struct dhcp_server *srv

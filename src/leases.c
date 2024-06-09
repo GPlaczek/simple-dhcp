@@ -53,3 +53,17 @@ struct lease *leaselist_get_lease(struct leaselist *ll, uint8_t *hwaddr, uint8_t
 
 	return lease;
 }
+
+struct lease *leaselist_find_lease(struct leaselist *ll, uint8_t *hwaddr, uint8_t hwlen, uint32_t xid) {
+	for (int i = 0; i < ll->len; i++) {
+		// Use a lease if it has been offered in the same transaction or if
+		// it was leased to the same hardware address before
+		if (ll->lease_vec[i].xid == xid ||
+			!memcmp(ll->lease_vec[i].chaddr, hwaddr, hwlen)
+		) {
+			return &ll->lease_vec[i];
+		}
+	}
+
+	return NULL;
+}

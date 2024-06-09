@@ -108,12 +108,13 @@ int main(int argc, char **argv) {
 			if (msg_size <= 0)
 				fprintf(stderr, "Error receiving the message (error %d)\n", errno);
 
-			process_dhcp_msg(&dhcp_msg, &dhcp_resp, &dhcpsrv);
+			err = process_dhcp_msg(&dhcp_msg, &dhcp_resp, &dhcpsrv);
+			if (err) {
+				msg_size = sendto(sfd, &dhcp_resp, sizeof(dhcp_resp), 0, (const struct sockaddr *)&s1, sizeof(s1));
 
-			msg_size = sendto(sfd, &dhcp_resp, sizeof(dhcp_resp), 0, (const struct sockaddr *)&s1, sizeof(s1));
-
-			if (msg_size < 0)
-				fprintf(stderr, "Could not send message (error %d)\n", errno);
+				if (msg_size < 0)
+					fprintf(stderr, "Could not send message (error %d)\n", errno);
+			}
 		} else if (poll_fds[0].revents & POLLIN) {
 			static long __void;
 			struct lease *lease = &dhcpsrv.llist.lease_vec[dhcpsrv.timer.current_lease];
